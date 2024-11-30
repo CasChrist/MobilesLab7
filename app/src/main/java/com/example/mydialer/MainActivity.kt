@@ -1,5 +1,6 @@
 package com.example.mydialer
 
+import android.content.SharedPreferences
 import android.os.Bundle
 import android.widget.EditText
 import androidx.appcompat.app.AppCompatActivity
@@ -23,12 +24,15 @@ class MainActivity : AppCompatActivity() {
     private val client = OkHttpClient()
     private lateinit var contactAdapter: ContactAdapter
     private lateinit var contactsList: List<Contact>
+    private lateinit var sharedPreferences: SharedPreferences
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
 
         Timber.plant(Timber.DebugTree())
+
+        sharedPreferences = getSharedPreferences("app_preferences", MODE_PRIVATE)
 
         val searchEditText = findViewById<EditText>(R.id.et_search)
         val recyclerView = findViewById<RecyclerView>(R.id.rView)
@@ -39,13 +43,16 @@ class MainActivity : AppCompatActivity() {
 
         loadContacts("https://drive.google.com/uc?export=download&id=1-KO-9GA3NzSgIc1dkAsNm8Dqw0fuPxcR")
 
+        val savedFilter = sharedPreferences.getString("SEARCH_FILTER", "") ?: ""
+        searchEditText.setText(savedFilter)
+
         searchEditText.addTextChangedListener { text ->
             val searchText = text.toString()
-            Timber.d("Searching for: $searchText")
+            Timber.d("Search text changed: $searchText")
 
-            if (searchText.isEmpty()) {
-                contactAdapter.submitList(contactsList)
-            } else {
+            sharedPreferences.edit().putString("SEARCH_FILTER", searchText).apply()
+
+            if (contactsList.isNotEmpty()) {
                 val filteredContacts = contactsList.filter { contact ->
                     contact.name.contains(searchText, ignoreCase = true)
                 }
@@ -65,7 +72,17 @@ class MainActivity : AppCompatActivity() {
                         val contacts = parseContacts(json)
                         runOnUiThread {
                             contactsList = contacts
+                            Timber.d("Contacts loaded: ${contactsList.size}")
                             contactAdapter.submitList(contactsList)
+
+                            // Применяем сохранённый фильтр после загрузки контактов
+                            val savedFilter = sharedPreferences.getString("SEARCH_FILTER", "") ?: ""
+                            if (savedFilter.isNotEmpty()) {
+                                val filteredContacts = contactsList.filter { contact ->
+                                    contact.name.contains(savedFilter, ignoreCase = true)
+                                }
+                                contactAdapter.submitList(filteredContacts)
+                            }
                         }
                     }
                 } else {
