@@ -1,9 +1,9 @@
 package com.example.mydialer
 
 import android.os.Bundle
-import android.text.Editable
-import android.text.TextWatcher
+import android.widget.EditText
 import androidx.appcompat.app.AppCompatActivity
+import androidx.core.widget.addTextChangedListener
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import com.google.gson.Gson
@@ -28,41 +28,30 @@ class MainActivity : AppCompatActivity() {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
 
-        // Initialize Timber
         Timber.plant(Timber.DebugTree())
 
-        // Initialize RecyclerView
+        val searchEditText = findViewById<EditText>(R.id.et_search)
         val recyclerView = findViewById<RecyclerView>(R.id.rView)
+
         recyclerView.layoutManager = LinearLayoutManager(this)
-        contactAdapter = ContactAdapter(emptyList())
+        contactAdapter = ContactAdapter()
         recyclerView.adapter = contactAdapter
 
-        // Load contacts from URL
         loadContacts("https://drive.google.com/uc?export=download&id=1-KO-9GA3NzSgIc1dkAsNm8Dqw0fuPxcR")
 
-        // Setup search EditText
-        val searchEditText = findViewById<android.widget.EditText>(R.id.et_search)
-        searchEditText.addTextChangedListener(object : TextWatcher {
-            override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
+        searchEditText.addTextChangedListener { text ->
+            val searchText = text.toString()
+            Timber.d("Searching for: $searchText")
 
-            override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {
-                filterContacts(s.toString())
+            if (searchText.isEmpty()) {
+                contactAdapter.submitList(contactsList)
+            } else {
+                val filteredContacts = contactsList.filter { contact ->
+                    contact.name.contains(searchText, ignoreCase = true)
+                }
+                contactAdapter.submitList(filteredContacts)
             }
-
-            override fun afterTextChanged(s: Editable?) {}
-        })
-    }
-
-    private fun filterContacts(searchText: String) {
-        Timber.d("Filtering contacts for query: $searchText")
-
-        val filteredContacts = if (searchText.isEmpty()) {
-            contactsList
-        } else {
-            contactsList.filter { it.name.contains(searchText, ignoreCase = true) }
         }
-
-        contactAdapter.updateContacts(filteredContacts)
     }
 
     private fun loadContacts(url: String) {
@@ -76,7 +65,7 @@ class MainActivity : AppCompatActivity() {
                         val contacts = parseContacts(json)
                         runOnUiThread {
                             contactsList = contacts
-                            contactAdapter.updateContacts(contactsList)
+                            contactAdapter.submitList(contactsList)
                         }
                     }
                 } else {
